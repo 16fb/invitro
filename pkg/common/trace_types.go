@@ -115,7 +115,7 @@ type Function struct {
 	CPURequestsMilli  int
 	MemoryRequestsMiB int
 	CPULimitsMilli    int
-	YAMLPath          string
+	YAMLPath          string // "container" vs "firecracker" -> workloads/xxx/trace_func_go.yml (For Knative config path)
 	PredeploymentPath []string
 	Specification     *FunctionSpecification
 
