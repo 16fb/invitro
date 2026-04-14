@@ -139,7 +139,7 @@ func (p *Azure2021TraceParser) Parse() []*common.Function {
 		})
 
 		// Generate IAT Array (IATs are microsecond precision) (cannot be same microsecond)
-		IATArray := common.IATArray{0.0}
+		IATArray := common.IATArray{}
 		var runtimeArray common.RuntimeSpecificationArray
 
 		finalInvocation := invocationSlice[len(invocationSlice)-1].startTime
@@ -148,7 +148,12 @@ func (p *Azure2021TraceParser) Parse() []*common.Function {
 
 		for i, invocation := range invocationSlice {
 			iat_microseconds := invocation.startTime * 1_000_000 //TODO consider math rounding errors.
-			iat := iat_microseconds - IATArray[i]
+			var iat float64
+			if len(IATArray) == 0 {
+				iat = iat_microseconds
+			} else {
+				iat = iat_microseconds - IATArray[i-1]
+			}
 			IATArray = append(IATArray, iat)
 
 			duration := time.Duration(invocation.startTime * float64(time.Second))
@@ -166,11 +171,15 @@ func (p *Azure2021TraceParser) Parse() []*common.Function {
 			RuntimeSpecification: runtimeArray,
 		}
 
+		// Normally directly lifted from csv file.
+		memoryStats := common.FunctionMemoryStats{Percentile100: 300}
+
 		// TODO: aaaaaaa
 		function := common.Function{
 			Name:                fmt.Sprintf("%s-%.5s-%.5s-%d", common.FunctionNamePrefix, funcID.appHash, funcID.functionHash, p.functionNameGenerator.Uint64()),
 			YAMLPath:            p.dirigentYamlPath,
 			ColdStartBusyLoopMs: generator.ComputeBusyLoopPeriod(150),
+			MemoryStats:         &memoryStats,
 		}
 
 		function.Specification = funcSpec
