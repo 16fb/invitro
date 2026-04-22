@@ -146,14 +146,28 @@ func (p *Azure2021TraceParser) Parse() []*common.Function {
 		lastMinuteNumber := int(time.Duration(finalInvocation * float64(time.Second)).Minutes())
 		perMinuteCount := make([]int, lastMinuteNumber+1)
 
-		for i, invocation := range invocationSlice {
-			iat_microseconds := invocation.startTime * 1_000_000 //TODO consider math rounding errors.
+		var previousInvocationTimestamp float64 = 0.0
+
+		for _, invocation := range invocationSlice {
+			// truncate if function invocation ends after durationMinutes.
+			if ((invocation.startTime + invocation.duration) > float64(p.durationMinutes * 60)){
+				continue
+			}
+
+			invocation_microseconds := invocation.startTime * 1_000_000 //TODO consider math rounding errors.
 			var iat float64
 			if len(IATArray) == 0 {
-				iat = iat_microseconds
+				iat = invocation_microseconds
+				previousInvocationTimestamp = invocation_microseconds
 			} else {
-				iat = iat_microseconds - IATArray[i-1]
+				iat = invocation_microseconds - previousInvocationTimestamp
+				previousInvocationTimestamp = invocation_microseconds
 			}
+			// Negative iat check
+			if (iat < 0) {log.Fatalf("Encountered negative iat of %s", strconv.FormatFloat(iat, 'f', -1, 64))}
+
+			// 
+
 			IATArray = append(IATArray, iat)
 
 			duration := time.Duration(invocation.startTime * float64(time.Second))
@@ -163,6 +177,11 @@ func (p *Azure2021TraceParser) Parse() []*common.Function {
 			runtime_milliseconds := int(math.Round(invocation.duration * 1_000))
 			memory := 150 // TODO, allow user to specify memory, current value was visual inspecction of average
 			runtimeArray = append(runtimeArray, common.RuntimeSpecification{Runtime: runtime_milliseconds, Memory: memory})
+		}
+
+		// If all invocations truncated out
+		if (len(IATArray) == 0){
+			continue
 		}
 
 		funcSpec := &common.FunctionSpecification{
