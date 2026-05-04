@@ -28,33 +28,53 @@ import (
 	"math"
 	"testing"
 
-	// Temp
 	"encoding/json"
 	"os"
 	"strconv"
+	"strings"
 
+	"reflect"	
 	"sort"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/vhive-serverless/loader/pkg/common"
 )
 
-// TODO, separate into 2 functions for better testing.
-func TestFunction(t *testing.T) {
-	tracePath := "test_data/AzureFunctionsInvocationTraceForTwoWeeksJan2021.csv"
-	durationToParse := 10
+func TestAzure2021ParserWrapper(t *testing.T) {
+	tracePath := "test_data/Azure2021.csv"
+	durationToParse := 3
 	yamlPath := "dummy"
+
+	writeToFile := false
 
 	traceParser := NewAzure2021Parser(tracePath, durationToParse, yamlPath)
 	functions := traceParser.Parse()
 
-	ReadOrWriteSpecificationToFile(functions, true, false)
+	if len(functions) != 14 {
+		t.Errorf("Invalid function array length. Expected 14, Got %d", len(functions))
+	}
+	
+	// Test values of aaaaa-11111 function
+	substr := "trace-func-aaaaa-11111-"
+	for _, function := range functions {
+		str := function.Name
+		if strings.Contains(str, substr) {
+			tolerance := 0.00001
+			if math.Abs(function.Specification.IAT[0]-1000000) > tolerance {
+				t.Errorf("Expected IAT value of 1000000, Got %f", function.Specification.IAT[0])
+			} else if function.Specification.RuntimeSpecification[0].Runtime != 9000 {
+				t.Errorf("Expected Runtime value of 9000, Got %d", function.Specification.RuntimeSpecification[0].Runtime)
+			}
+		}
+	}
 
-	durationToParse = 21
+	if (writeToFile){
+		ReadOrWriteSpecificationToFile(functions, true, false)
+	}
 }
 
 // Test read data and deriving "start_timestamp" into InvocationTracker hashmap
-func TestParseCSVFile(t *testing.T) {
+func TestAzure2021ParseCSVFile(t *testing.T) {
 	var filePath string = "test_data/Azure2021.csv"
 	invocationTracker := ParseCSVFile(filePath)
 
@@ -114,6 +134,78 @@ func TestParseCSVFile(t *testing.T) {
 		}
 	}
 }
+
+// Test transformation of InvocationArray into specification struct.
+func TestAzure2021GenerateFunctionSpecification(t *testing.T) {
+	memoryDefault := 150
+
+	spec1 := common.FunctionSpecification{
+		IAT:                  common.IATArray{1000000},
+		PerMinuteCount:       []int{1},
+		RuntimeSpecification: common.RuntimeSpecificationArray{
+			common.RuntimeSpecification{Runtime: 1000, Memory: memoryDefault},
+		},
+	}
+	spec2 := common.FunctionSpecification{
+		IAT:                  common.IATArray{1000000, 1000000, 1000000},
+		PerMinuteCount:       []int{3},
+		RuntimeSpecification: common.RuntimeSpecificationArray{
+			common.RuntimeSpecification{Runtime: 1000, Memory: memoryDefault}, 
+			common.RuntimeSpecification{Runtime: 1000, Memory: memoryDefault}, 
+			common.RuntimeSpecification{Runtime: 1000, Memory: memoryDefault},
+		},
+	}
+	spec3 := common.FunctionSpecification{
+		IAT:                  common.IATArray{},
+		PerMinuteCount:       []int{},
+		RuntimeSpecification: common.RuntimeSpecificationArray{},
+	}
+	spec4 := common.FunctionSpecification{
+		IAT:                  common.IATArray{3000000, 18000000},
+		PerMinuteCount:       []int{2},
+		RuntimeSpecification: common.RuntimeSpecificationArray{
+			common.RuntimeSpecification{Runtime: 5000, Memory: memoryDefault}, 
+			common.RuntimeSpecification{Runtime: 6000, Memory: memoryDefault}, 
+		},
+	}
+	spec5 := common.FunctionSpecification{
+		IAT:                  common.IATArray{30000000, 41000000, 24000000},
+		PerMinuteCount:       []int{1,2},
+		RuntimeSpecification: common.RuntimeSpecificationArray{
+			common.RuntimeSpecification{Runtime: 20000, Memory: memoryDefault}, 
+			common.RuntimeSpecification{Runtime: 5000, Memory: memoryDefault}, 
+			common.RuntimeSpecification{Runtime: 17000, Memory: memoryDefault}, 
+		},
+	}
+
+	tests := map[string]struct {
+		// Inputs
+		slice           Invocations
+		durationMinutes int
+		// Outputs
+		funcSpec common.FunctionSpecification
+		empty    bool
+	}{
+		"single invocation": {slice: Invocations{Invocation{1.0, 1.0}}, durationMinutes: 2, funcSpec: spec1, empty: false},
+		"triple invocation": {slice: Invocations{Invocation{1.0, 1.0}, Invocation{2.0, 1.0}, Invocation{3.0, 1.0}}, durationMinutes: 2, funcSpec: spec2, empty: false},
+		"outside durationMinutes": {slice: Invocations{Invocation{61.0, 5.0}, Invocation{70.0, 5.0}}, durationMinutes: 1, funcSpec: spec3, empty: true},
+		"variable runtime": {slice: Invocations{Invocation{3.0, 5.0}, Invocation{21.0, 6.0}}, durationMinutes: 2, funcSpec: spec4, empty: false},
+		"sparse invocations": {slice: Invocations{Invocation{30.0, 20.0}, Invocation{71.0, 5.0}, Invocation{95.0, 17.0}}, durationMinutes: 3, funcSpec: spec5, empty: false},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			funcSpec, empty := GenerateFunctionSpecification(tc.slice, tc.durationMinutes)
+
+			if empty && tc.empty && (funcSpec == nil) { // Invocations outside durationMinutes
+				
+			} else if !reflect.DeepEqual(*funcSpec, tc.funcSpec) {
+				t.Errorf("expected: %v, got: %v", funcSpec, tc.funcSpec)
+			}
+		})
+	}
+}
+
 
 func ReadOrWriteSpecificationToFile(functions []*common.Function, writeIATsToFile bool, readIATsFromFile bool) {
 	if writeIATsToFile && readIATsFromFile {

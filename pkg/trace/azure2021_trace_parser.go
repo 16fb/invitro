@@ -67,7 +67,7 @@ func (p *Azure2021TraceParser) Parse() []*common.Function {
 	/* invocationTracker populated, begin creating function array. */
 	for funcID, invocationSlice := range invocationTracker {
 
-		funcSpec, empty := GenerateFunctionSpecification(funcID, invocationSlice, p.durationMinutes)
+		funcSpec, empty := GenerateFunctionSpecification(invocationSlice, p.durationMinutes)
 		if empty {
 			continue
 		}
@@ -167,7 +167,7 @@ func ParseCSVFile(filePath string) map[UniqueFunctionID]Invocations {
 	return invocationTracker
 }
 
-func GenerateFunctionSpecification(funcID UniqueFunctionID, invocationSlice Invocations, durationMinutes int) (*common.FunctionSpecification, bool) {
+func GenerateFunctionSpecification(invocationSlice Invocations, durationMinutes int) (*common.FunctionSpecification, bool) {
 
 	// sort from first to last invocation
 	sort.Slice(invocationSlice, func(i, j int) bool {
