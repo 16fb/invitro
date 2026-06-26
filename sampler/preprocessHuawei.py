@@ -73,17 +73,53 @@ def preprocess_huawei(trace_dir: str, start_time: str, duration: str, output_dir
 
 
     # Transform to sampler format (inv_df, mem_df, run_df)
+    inv_df = generate_inv_df(result[3])
     
-
-
     return
+
+
+def generate_inv_df(requests_minute_df: pd.DataFrame) -> pd.DataFrame: # Honestly creating test will make me more confident
+
+    # Make columns into minute bins
+    df = requests_minute_df.drop(columns='day')
+    df['time'] = df['time']/60 + 1 # inv_df starts from minute 1
+    df = df.set_index('time', drop=True)
+    df = df.T
+
+    # Add in front 4 columns
+    front_cols = ["HashOwner", "HashApp", "HashFunction", "Trigger"]
+    empty_front_df = pd.DataFrame(columns=front_cols, index=df.index)
+    df = pd.concat([empty_front_df, df], axis=1)
+
+    df["HashOwner"] = 0
+    df['HashApp'] = df.index
+    df['HashFunction'] = df.index
+    df["Trigger"] = "http"
+
+    # Filter out functions with 0 invocations
+    minute_bin_columns = df.columns[4:]
+    df = df.dropna(subset=minute_bin_columns, how='all')
+
+    return df
+
+def generate_mem_df(memory_limit_minute: pd.DataFrame, inv_df: pd.DataFrame) -> pd.DataFrame:
+    
+    # Determine memory usage in minute
+
+    # Memory is total function footprint -> allocated memory across all pods.
+    
+    
+    # Filter out functions with 0 invocations
+
+    return df
+
 
 
 if __name__ == "__main__":
 
-    trace_dir = "..\Huawei2023\private_dataset"
+    trace_dir = "../Huawei2023/private_dataset"
     start_time = "00:00:30"  # DD:HH:MM 
     duration = 5             # Minutes
-    output_dir = "..\Huawei2023\output"
+    output_dir = "../Huawei2023/output"
     
     preprocess_huawei(trace_dir, start_time, duration, output_dir, 0)
