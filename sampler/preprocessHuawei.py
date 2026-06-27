@@ -74,6 +74,10 @@ def preprocess_huawei(trace_dir: str, start_time: str, duration: str, output_dir
 
     # Transform to sampler format (inv_df, mem_df, run_df)
     inv_df = generate_inv_df(result[3])
+    mem_df = generate_mem_df(result[1])
+
+    # Filter out functions with 0 invocations
+
     
     return
 
@@ -102,17 +106,54 @@ def generate_inv_df(requests_minute_df: pd.DataFrame) -> pd.DataFrame: # Honestl
 
     return df
 
-def generate_mem_df(memory_limit_minute: pd.DataFrame, inv_df: pd.DataFrame) -> pd.DataFrame:
+# Memory is total function footprint -> allocated memory across all pods for a single function.
+def generate_mem_df(memory_limit_minute: pd.DataFrame) -> pd.DataFrame:
     
-    # Determine memory usage in minute
+    # Make columns into minute bins
+    df = memory_limit_minute.drop(columns='day')
+    df['time'] = df['time']/60 + 1 # inv_df starts from minute 1
+    df = df.set_index('time', drop=True)
+    df = df.T
 
-    # Memory is total function footprint -> allocated memory across all pods.
-    
-    
-    # Filter out functions with 0 invocations
+    minute_bin_columns = df.columns
+    min_bin_df = df[minute_bin_columns]
+
+    # Set IDs
+    df["HashFunction"] = df.index
+    df["HashOwner"] = 0
+    df['HashApp'] = df.index
+
+    # Sample count is estimated as count of non-NAN samples
+    df["SampleCount"] = min_bin_df.count(axis=1)
+
+    # Calculate percentiles from datapoints within time interval
+    df["AverageAllocatedMb_pct1"] = min_bin_df.quantile(0.01, axis=1)
+    df["AverageAllocatedMb_pct5"] = min_bin_df.quantile(0.05, axis=1)
+    df["AverageAllocatedMb_pct25"] = min_bin_df.quantile(0.25, axis=1)
+    df["AverageAllocatedMb_pct50"] = min_bin_df.quantile(0.50, axis=1)
+    df["AverageAllocatedMb_pct75"] = min_bin_df.quantile(0.75, axis=1)
+    df["AverageAllocatedMb_pct95"] = min_bin_df.quantile(0.95, axis=1)
+    df["AverageAllocatedMb_pct99"] = min_bin_df.quantile(0.99, axis=1)
+    df["AverageAllocatedMb_pct100"] = min_bin_df.quantile(1.00, axis=1)    
+
+    # Cleanup - Keep only required columns
+    column_order = [
+        "HashFunction", "HashOwner", "HashApp", "SampleCount", 
+        "AverageAllocatedMb", "AverageAllocatedMb_pct1", "AverageAllocatedMb_pct5", "AverageAllocatedMb_pct25",
+        "AverageAllocatedMb_pct50", "AverageAllocatedMb_pct75", "AverageAllocatedMb_pct95", "AverageAllocatedMb_pct99", "AverageAllocatedMb_pct100"
+    ]    
+    df = df.reindex(columns=column_order)
 
     return df
 
+
+def filter_out_functions_with_zero_invocations():
+    return 1
+
+
+def generate_dur_df(function_delay_minute: pd.DataFrame, inv_df: pd.DataFrame) -> pd.DataFrame:
+
+    return df
 
 
 if __name__ == "__main__":
