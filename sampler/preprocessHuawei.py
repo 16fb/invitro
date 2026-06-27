@@ -24,6 +24,7 @@ import pandas as pd
 import logging as log
 import numpy as np
 from pathlib import Path
+from typing import Tuple
 
 def preprocess_huawei(trace_dir: str, start_time: str, duration: str, output_dir: str, zero_ms_threshold_percent: str) -> pd.DataFrame:
     
@@ -72,17 +73,25 @@ def preprocess_huawei(trace_dir: str, start_time: str, duration: str, output_dir
 
 
     # Transform to sampler format (inv_df, mem_df, run_df)
+    # All generation filters out zero/NaN values
     inv_df = generate_inv_df(result[3])
     mem_df = generate_mem_df(result[1])
     dur_df = generate_dur_df(result[0])
 
-    # Filter out functions with 0 invocations
+    inv_df, mem_df, dur_df = get_intersection(inv_df, mem_df, dur_df)
 
+    # Save to output
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    inv_df.to_csv(output_dir / "invocations.csv", index=False)
+    mem_df.to_csv(output_dir / "memory.csv", index=False)
+    dur_df.to_csv(output_dir / "durations.csv", index=False)
     
     return
 
-
-def generate_inv_df(requests_minute_df: pd.DataFrame) -> pd.DataFrame: # Honestly creating test will make me more confident
+# Count of invocations per minute. Filters out functions with 0 invocations.
+def generate_inv_df(requests_minute_df: pd.DataFrame) -> pd.DataFrame:
 
     # Make columns into minute bins
     df = requests_minute_df.drop(columns='day')
@@ -134,7 +143,10 @@ def generate_mem_df(memory_limit_minute: pd.DataFrame) -> pd.DataFrame:
     df["AverageAllocatedMb_pct75"] = min_bin_df.quantile(0.75, axis=1)
     df["AverageAllocatedMb_pct95"] = min_bin_df.quantile(0.95, axis=1)
     df["AverageAllocatedMb_pct99"] = min_bin_df.quantile(0.99, axis=1)
-    df["AverageAllocatedMb_pct100"] = min_bin_df.quantile(1.00, axis=1)    
+    df["AverageAllocatedMb_pct100"] = min_bin_df.quantile(1.00, axis=1)
+
+    # Filter out zero allocated memory
+    df = df.loc[df["SampleCount"] != 0]
 
     # Cleanup - Keep only required columns
     column_order = [
@@ -176,6 +188,9 @@ def generate_dur_df(function_delay_minute: pd.DataFrame) -> pd.DataFrame:
     df["percentile_Average_99"] = min_bin_df.quantile(0.99, axis=1)
     df["percentile_Average_100"] = min_bin_df.quantile(1.00, axis=1)
 
+    # Filter out zero duration
+    df = df.loc[df["Count"] != 0]
+
     # Cleanup - Keep only required columns
     new_columns = [
         "HashOwner", "HashApp", "HashFunction", 
@@ -187,8 +202,30 @@ def generate_dur_df(function_delay_minute: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
-def filter_out_functions_with_zero_invocations():
-    return 1
+# Filter for functions that appear in all 3 dfs.
+def get_intersection(
+        inv_df: pd.DataFrame, mem_df: pd.DataFrame, run_df: pd.DataFrame
+) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    
+    # Matches cols that are same across all 3 DFs
+    cols = ['HashApp', 'HashFunction']
+    common_idx = (
+        inv_df.set_index(cols).index
+        .intersection(mem_df.set_index(cols).index)
+        .intersection(run_df.set_index(cols).index)
+    )
+
+    inv_df_cleaned = inv_df.set_index(cols).loc[common_idx].reset_index()
+    mem_df_cleaned = mem_df.set_index(cols).loc[common_idx].reset_index()
+    run_df_cleaned = run_df.set_index(cols).loc[common_idx].reset_index()
+
+    log.debug(f"inv_df row count after intersection: {len(inv_df)}")
+    log.debug(f"mem_df row count after intersection: {len(mem_df)}")
+    log.debug(f"run_df row count after intersection: {len(run_df)}")
+    
+    return inv_df_cleaned, mem_df_cleaned, run_df_cleaned
+
+    # Leaves only rows with the common HashApp and HashFunction values in all 3 dfs
 
 if __name__ == "__main__":
 
