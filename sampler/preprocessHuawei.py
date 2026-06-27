@@ -25,7 +25,6 @@ import logging as log
 import numpy as np
 from pathlib import Path
 
-
 def preprocess_huawei(trace_dir: str, start_time: str, duration: str, output_dir: str, zero_ms_threshold_percent: str) -> pd.DataFrame:
     
     # Time interval filter // Allow cross day filtering?
@@ -75,6 +74,7 @@ def preprocess_huawei(trace_dir: str, start_time: str, duration: str, output_dir
     # Transform to sampler format (inv_df, mem_df, run_df)
     inv_df = generate_inv_df(result[3])
     mem_df = generate_mem_df(result[1])
+    dur_df = generate_dur_df(result[0])
 
     # Filter out functions with 0 invocations
 
@@ -146,15 +146,49 @@ def generate_mem_df(memory_limit_minute: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
+# Duration is function execution time averaged over all pods, timestamped in minute basis
+def generate_dur_df(function_delay_minute: pd.DataFrame) -> pd.DataFrame:
 
-def filter_out_functions_with_zero_invocations():
-    return 1
+    # Make columns into minute bins
+    df = function_delay_minute.drop(columns='day')
+    df['time'] = df['time']/60 + 1 # inv_df starts fro#m minute 1
+    df = df.set_index('time', drop=True)
+    df = df.T
 
+    minute_bin_columns = df.columns
+    min_bin_df = df[minute_bin_columns]
 
-def generate_dur_df(function_delay_minute: pd.DataFrame, inv_df: pd.DataFrame) -> pd.DataFrame:
+    # Set IDs
+    df["HashOwner"] = 0
+    df['HashApp'] = df.index
+    df["HashFunction"] = df.index
+
+    # Generate stats (derived from datapoints within time interval)
+    df["Average"] = min_bin_df.mean(axis=1)
+    df["Count"] = min_bin_df.count(axis=1)
+    df["Minimum"] = min_bin_df.min(axis=1)
+    df["Maximum"] = min_bin_df.max(axis=1)
+    df["percentile_Average_0"] = min_bin_df.quantile(0.00, axis=1)
+    df["percentile_Average_1"] = min_bin_df.quantile(0.01, axis=1)
+    df["percentile_Average_25"] = min_bin_df.quantile(0.25, axis=1)
+    df["percentile_Average_50"] = min_bin_df.quantile(0.50, axis=1)
+    df["percentile_Average_75"] = min_bin_df.quantile(0.75, axis=1)
+    df["percentile_Average_99"] = min_bin_df.quantile(0.99, axis=1)
+    df["percentile_Average_100"] = min_bin_df.quantile(1.00, axis=1)
+
+    # Cleanup - Keep only required columns
+    new_columns = [
+        "HashOwner", "HashApp", "HashFunction", 
+        "Average", "Count", "Minimum", "Maximum",
+        "percentile_Average_0", "percentile_Average_1", "percentile_Average_25", "percentile_Average_50", 
+        "percentile_Average_75", "percentile_Average_99", "percentile_Average_100"
+    ] + ["duration"]
+    df = df.reindex(columns=new_columns)
 
     return df
 
+def filter_out_functions_with_zero_invocations():
+    return 1
 
 if __name__ == "__main__":
 
