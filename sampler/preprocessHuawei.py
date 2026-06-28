@@ -102,8 +102,12 @@ def generate_inv_df(requests_minute_df: pd.DataFrame) -> pd.DataFrame:
     df["Trigger"] = "http"
 
     # Filter out functions with 0 invocations
+    prefiltered_df = df
+
     minute_bin_columns = df.columns[4:]
     df = df.dropna(subset=minute_bin_columns, how='all')
+
+    log.info(f"Inv df removed uninvoked functions (before -> after): {len(prefiltered_df)} -> {len(df)}")
 
     # Set 0 invocations from NaN to 0.
     df = df.fillna(0)
@@ -215,9 +219,9 @@ def get_intersection(
     mem_df_cleaned = mem_df.set_index(cols).loc[common_idx].reset_index()
     run_df_cleaned = run_df.set_index(cols).loc[common_idx].reset_index()
 
-    log.debug(f"inv_df row count after intersection: {len(inv_df)}")
-    log.debug(f"mem_df row count after intersection: {len(mem_df)}")
-    log.debug(f"run_df row count after intersection: {len(run_df)}")
+    log.info(f"inv_df row count after intersection: {len(inv_df)}")
+    log.info(f"mem_df row count after intersection: {len(mem_df)}")
+    log.info(f"run_df row count after intersection: {len(run_df)}")
     
     return inv_df_cleaned, mem_df_cleaned, run_df_cleaned
 
