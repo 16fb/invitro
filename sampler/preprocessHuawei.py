@@ -113,6 +113,9 @@ def generate_inv_df(requests_minute_df: pd.DataFrame) -> pd.DataFrame:
     minute_bin_columns = df.columns[4:]
     df = df.dropna(subset=minute_bin_columns, how='all')
 
+    # Set 0 invocations from NaN to 0.
+    df = df.fillna(0)
+
     return df
 
 # Memory is total function footprint -> allocated memory across all pods for a single function.
