@@ -41,22 +41,15 @@ def preprocess_huawei(trace_dir: str, start_time: str, duration: str, output_dir
     starting_day = td_interval_start.days
     ending_day = td_interval_end.days
 
-    # Read all within time interval
-    trace_dir = Path(trace_dir)
-    list_of_directories_to_read = ["function_delay_minute", "memory_limit_minute", "memory_usage_minute", "requests_minute"] # Should be a dictionary
-
-    # matrix = {
-    #     "function_delay_minute": [Path("function_delay_minute"), ],
-    #     "memory_limit_minute": [Path("memory_limit_minute"),],
-    #     "memory_usage_minute": [Path("memory_usage_minute"),],
-    #     "requests_minute": [Path("function_delay_minute"),],
-    # }
-
-    # Read single metric 
-    result = []
-    for directory in list_of_directories_to_read:
-        directory = trace_dir / directory
-
+    # Read all metrics within time interval
+    metrics = {
+        "function_delay_minute": {"path": Path("function_delay_minute"), "df": pd.DataFrame()},
+        "memory_limit_minute": {"path": Path("memory_limit_minute"), "df": pd.DataFrame()},
+        "memory_usage_minute": {"path": Path("memory_usage_minute"), "df": pd.DataFrame()},
+        "requests_minute": {"path": Path("function_delay_minute"), "df": pd.DataFrame()},
+    }
+    for metric, value in metrics.items():
+        directory = Path(trace_dir) / value["path"]
         final_df = pd.DataFrame()
 
         # Determine files to read
@@ -69,14 +62,13 @@ def preprocess_huawei(trace_dir: str, start_time: str, duration: str, output_dir
 
             final_df = pd.concat([final_df, df], ignore_index=True)
 
-        result.append(final_df)
-
+        value["df"] = final_df
 
     # Transform to sampler format (inv_df, mem_df, run_df)
     # All generation filters out zero/NaN values
-    inv_df = generate_inv_df(result[3])
-    mem_df = generate_mem_df(result[1])
-    dur_df = generate_dur_df(result[0])
+    inv_df = generate_inv_df(metrics["requests_minute"]["df"])
+    mem_df = generate_mem_df(metrics["memory_limit_minute"]["df"])
+    dur_df = generate_dur_df(metrics["function_delay_minute"]["df"])
 
     inv_df, mem_df, dur_df = get_intersection(inv_df, mem_df, dur_df)
 
