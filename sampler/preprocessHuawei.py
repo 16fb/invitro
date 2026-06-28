@@ -138,7 +138,7 @@ def generate_mem_df(memory_limit_minute: pd.DataFrame) -> pd.DataFrame:
     # Sample count is estimated as count of non-NAN samples
     df["SampleCount"] = min_bin_df.count(axis=1)
 
-    # Calculate percentiles from datapoints within time interval
+    # Calculate percentiles from non-NAN datapoints within time interval
     df["AverageAllocatedMb"] = min_bin_df.mean(axis=1)
     df["AverageAllocatedMb_pct1"] = min_bin_df.quantile(0.01, axis=1)
     df["AverageAllocatedMb_pct5"] = min_bin_df.quantile(0.05, axis=1)
@@ -157,7 +157,7 @@ def generate_mem_df(memory_limit_minute: pd.DataFrame) -> pd.DataFrame:
         "HashFunction", "HashOwner", "HashApp", "SampleCount", 
         "AverageAllocatedMb", "AverageAllocatedMb_pct1", "AverageAllocatedMb_pct5", "AverageAllocatedMb_pct25",
         "AverageAllocatedMb_pct50", "AverageAllocatedMb_pct75", "AverageAllocatedMb_pct95", "AverageAllocatedMb_pct99", "AverageAllocatedMb_pct100"
-    ]    
+    ]
     df = df.reindex(columns=column_order)
 
     return df
