@@ -136,6 +136,7 @@ def generate_mem_df(memory_limit_minute: pd.DataFrame) -> pd.DataFrame:
     df["SampleCount"] = min_bin_df.count(axis=1)
 
     # Calculate percentiles from datapoints within time interval
+    df["AverageAllocatedMb"] = min_bin_df.mean(axis=1)
     df["AverageAllocatedMb_pct1"] = min_bin_df.quantile(0.01, axis=1)
     df["AverageAllocatedMb_pct5"] = min_bin_df.quantile(0.05, axis=1)
     df["AverageAllocatedMb_pct25"] = min_bin_df.quantile(0.25, axis=1)
