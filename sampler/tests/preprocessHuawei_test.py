@@ -27,16 +27,62 @@ import pytest
 import os
 
 from sampler.preprocessHuawei import (
-    preprocess_huawei
+    preprocess_huawei,
+    generate_inv_df
 )
 
-def test_preprocess_huawei():
+# def test_preprocess_huawei():
 
-    os.getcwd() # Actual 
+#     os.getcwd() # Actual 
 
-    # Test preprocess_huawei
-    trace_dir = "yes"
-    start_time = "00:00:00"  # DD:HH:MM 
-    duration = 5             # Minutes
+#     # Test preprocess_huawei
+#     trace_dir = "yes"
+#     start_time = "00:00:00"  # DD:HH:MM 
+#     duration = 5             # Minutes
     
-    #preprocess_huawei(trace_dir: str, start_time: str, duration: str, output_dir: str)
+#     #preprocess_huawei(trace_dir: str, start_time: str, duration: str, output_dir: str)
+
+# MAYBE STILL IMPLEMENT
+# def test_time_slicing():
+#     return 0
+
+NaN = np.nan
+
+def test_generate_inv_df():
+
+    # Zero is equivalent to NaN
+    input_df = pd.DataFrame({
+        "day":  [0, 0, 0],
+        "time": [0, 60, 120],
+        "0":    [10, 20, 30],       #
+        "1":    [NaN, NaN, NaN],    # Zero invocations -> drop
+        "2":    [NaN, 10, NaN],     # At least 1 invocation -> keep
+        "3":    [5583, 3552, 4254], # 
+        "4":    [200, 0, 20],       # '0' in input -> keep
+    })
+
+    expected_df = pd.DataFrame({
+        "HashOwner":    ["0", "0", "0", "0"],
+        "HashApp":      ["0", "2", "3", "4"],
+        "HashFunction": ["0", "2", "3", "4"],
+        "Trigger":      ["http", "http", "http", "http"],
+        "1":            [10, 0, 5583, 200],
+        "2":            [20, 10, 3552, 0],
+        "3":            [30, 0, 4254, 20],
+    })
+
+    inv_df = generate_inv_df(input_df)
+    pd.testing.assert_frame_equal(inv_df, expected_df)
+
+# def test_generate_inv_df_error_thrown():
+#     raise Exception("Starting hour and starting minute should not be negative")
+
+def test_generate_mem_df():
+    return 0
+
+def test_generate_dur_df():
+    return 0
+
+# Full function happy path test
+def test_preprocess_huawei():
+    return 0
