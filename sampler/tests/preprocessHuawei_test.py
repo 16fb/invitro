@@ -28,7 +28,8 @@ import os
 
 from sampler.preprocessHuawei import (
     preprocess_huawei,
-    generate_inv_df
+    generate_inv_df,
+    generate_mem_df
 )
 
 # def test_preprocess_huawei():
@@ -49,8 +50,6 @@ from sampler.preprocessHuawei import (
 NaN = np.nan
 
 def test_generate_inv_df():
-
-    # Zero is equivalent to NaN
     input_df = pd.DataFrame({
         "day":  [0, 0, 0],
         "time": [0, 60, 120],
@@ -74,11 +73,35 @@ def test_generate_inv_df():
     inv_df = generate_inv_df(input_df)
     pd.testing.assert_frame_equal(inv_df, expected_df)
 
-# def test_generate_inv_df_error_thrown():
-#     raise Exception("Starting hour and starting minute should not be negative")
-
 def test_generate_mem_df():
-    return 0
+
+    input_df = pd.DataFrame({
+        "day":  [0, 0, 0],
+        "time": [0, 60, 120],
+        "0":    [400, 400, 400],    #
+        "1":    [NaN, NaN, NaN],    # Zero memory allocation -> drop
+        "2":    [NaN, 10, 20],      # At least 1 memory allocation -> keep
+        "3":    [10, 50, 90],       #
+    })
+
+    expected_df = pd.DataFrame({
+        "HashFunction":              ["0", "2", "3"],
+        "HashOwner":                 ["0", "0", "0"],
+        "HashApp":                   ["0", "2", "3"],
+        "SampleCount":               [  3,   2,   3],
+        "AverageAllocatedMb":        [400.0, 15.0, 50.0],
+        "AverageAllocatedMb_pct1":   [400.0, 10.1, 10.8],
+        "AverageAllocatedMb_pct5":   [400.0, 10.5, 14.0],
+        "AverageAllocatedMb_pct25":  [400.0, 12.5, 30.0],
+        "AverageAllocatedMb_pct50":  [400.0, 15.0, 50.0],
+        "AverageAllocatedMb_pct75":  [400.0, 17.5, 70.0],
+        "AverageAllocatedMb_pct95":  [400.0, 19.5, 86.0],
+        "AverageAllocatedMb_pct99":  [400.0, 19.9, 89.2],
+        "AverageAllocatedMb_pct100": [400.0, 20.0, 90.0],
+    })
+
+    mem_df = generate_mem_df(input_df)
+    pd.testing.assert_frame_equal(mem_df, expected_df)
 
 def test_generate_dur_df():
     return 0
