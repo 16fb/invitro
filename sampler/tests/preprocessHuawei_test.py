@@ -29,7 +29,8 @@ import os
 from sampler.preprocessHuawei import (
     preprocess_huawei,
     generate_inv_df,
-    generate_mem_df
+    generate_mem_df,
+    generate_dur_df
 )
 
 # def test_preprocess_huawei():
@@ -104,7 +105,36 @@ def test_generate_mem_df():
     pd.testing.assert_frame_equal(mem_df, expected_df)
 
 def test_generate_dur_df():
-    return 0
+
+    input_df = pd.DataFrame({
+        "day":  [0, 0, 0],
+        "time": [0, 60, 120],
+        "0":    [1.00, 1.50, 2.00],  # Standard
+        "1":    [NaN, NaN, NaN],     # Zero memory allocation -> drop
+        "2":    [NaN, 10.0, 10.0],   # At least 1 memory allocation
+        "3":    [1.0, 2.0, 3.555],   # Test 3dp precision
+    })
+
+    expected_df = pd.DataFrame({
+        "HashFunction":             [ "0",  "2",    "3"],
+        "HashOwner":                [ "0",  "0",    "0"],
+        "HashApp":                  [ "0",  "2",    "3"],
+        "Average":                  [ 1.5, 10.0,  2.185],
+        "Count":                    [   3,    2,      3],
+        "Minimum":                  [ 1.0, 10.0,    1.0],
+        "Maximum":                  [ 2.0, 10.0,  3.555],
+        "percentile_Average_0":     [1.00, 10.0,    1.0],
+        "percentile_Average_1":     [1.01, 10.0,   1.02],
+        "percentile_Average_25":    [1.25, 10.0,    1.5],
+        "percentile_Average_50":    [ 1.5, 10.0,      2],
+        "percentile_Average_75":    [1.75, 10.0, 2.7775],
+        "percentile_Average_99":    [1.99, 10.0, 3.5239],
+        "percentile_Average_100":   [2.00, 10.0,  3.555],
+    })
+
+    dur_df = generate_dur_df(input_df)
+    pd.testing.assert_frame_equal(dur_df, expected_df)
+
 
 # Full function happy path test
 def test_preprocess_huawei():
