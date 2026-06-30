@@ -201,11 +201,11 @@ def generate_dur_df(function_delay_minute: pd.DataFrame) -> pd.DataFrame:
 
     # Cleanup - Keep only required columns
     new_columns = [
-        "HashOwner", "HashApp", "HashFunction", 
+        "HashFunction", "HashOwner", "HashApp",  
         "Average", "Count", "Minimum", "Maximum",
         "percentile_Average_0", "percentile_Average_1", "percentile_Average_25", "percentile_Average_50", 
         "percentile_Average_75", "percentile_Average_99", "percentile_Average_100"
-    ] + ["duration"]
+    ]
     df = df.reindex(columns=new_columns)
     df = df.rename_axis(None, axis=1)
     df = df.reset_index(drop=True)
